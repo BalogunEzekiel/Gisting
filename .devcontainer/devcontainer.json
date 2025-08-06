@@ -1,13 +1,11 @@
-
 {
   "name": "Python 3",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
   "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
   "customizations": {
     "codespaces": {
       "openFiles": [
         "README.md",
-        "text_voice.py"
+        "app.py"
       ]
     },
     "vscode": {
@@ -18,10 +16,8 @@
       ]
     }
   },
-  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; echo '✅ Packages installed and Requirements met'",
-  "postAttachCommand": {
-    "server": "streamlit run text_voice.py --server.enableCORS false --server.enableXsrfProtection false"
-  },
+  "updateContentCommand": "if [ -f packages.txt ]; then sudo apt update && sudo apt upgrade -y && xargs -a packages.txt sudo apt install -y; fi; if [ -f requirements.txt ]; then pip3 install --user -r requirements.txt; fi; echo '✅ Packages installed and Requirements met'",
+  "postAttachCommand": "streamlit run app.py --server.enableCORS false --server.enableXsrfProtection false",
   "portsAttributes": {
     "8501": {
       "label": "Application",
