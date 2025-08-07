@@ -24,9 +24,12 @@ languages = {
     "Swahili": "sw"
 }
 
+source_lang = st.selectbox("🎤 Select Spoken Language", options=list(input_languages.keys()))
+target_lang = st.selectbox("🗣️ Translate To", options=list(translation_languages.keys()), index=1)
+
 # Language selection
-source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
-target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
+#source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
+#target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
 
 st.markdown("💡 Speak clearly into your microphone...")
 
@@ -79,8 +82,14 @@ class AudioProcessor(AudioProcessorBase):
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 self.result_queue.put(text)
+        except sr.UnknownValueError:
+            print("[Speech recognition error] Could not understand audio")
+            self.result_queue.put("[Could not transcribe speech]")
+        except sr.RequestError as e:
+            print(f"[Speech recognition error] API unavailable or quota exceeded: {e}")
+            self.result_queue.put("[Could not transcribe speech]")
         except Exception as e:
-            print(f"[Speech recognition error] {e}")
+            print(f"[Unexpected error during speech recognition] {type(e).__name__}: {e}")
             self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
