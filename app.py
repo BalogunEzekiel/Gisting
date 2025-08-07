@@ -1,121 +1,105 @@
-# app.py
-
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode, RTCConfiguration
-import speech_recognition as sr
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration, AudioProcessorBase
 from utils.translator import translate_text, generate_tts_audio
-import tempfile
-import os
 import av
 import queue
-import numpy as np
-import wave
 
-# Page setup
-st.set_page_config(page_title="🎙️ Gisting", layout="centered")
+# RTC Configuration (uses public Google STUN server)
+rtc_config = RTCConfiguration({
+    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+})
 
-# Show logo and title
-st.image("assets/gistinglogo.png", width=150)
-st.subheader("Real-Time Voice-to-Voice Translator")
+# Setup audio queue
+audio_queue = queue.Queue()
 
-# Language dictionary
-languages = {
-    "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
-    "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
-    "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn",
-    "Swahili": "sw"
-}
+# Page configuration
+st.set_page_config(page_title="🎙️ Gisting - Real-time Speech Translator", layout="centered")
+st.title("🎙️ Gisting - Real-time Speech Translator")
 
-# Language selection
-source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
-target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
+st.markdown("Speak into your mic, get instant translation and audio playback in your preferred language.")
 
-st.markdown("💡 Speak clearly into your microphone...")
+# Language settings
+target_lang = st.selectbox("Select language to translate to", ["en", "fr", "de", "es", "ha", "yo", "ig"], index=0)
 
-# TURN/STUN Configuration
-rtc_configuration = RTCConfiguration(
-    {
-        "iceServers": [
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-            {"urls": ["stun:stun.ekiga.net"]},
-            {
-                "urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
-                "username": "openrelayproject",
-                "credential": "openrelayproject"
-            }
-        ]
-    }
-)
-
-# Audio processor class
+# Define AudioProcessor
 class AudioProcessor(AudioProcessorBase):
     def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.result_queue = queue.Queue()
+        self.recognizer = None
+        self.mic_ready = False
 
-    def recv(self, frame: av.AudioFrame):
-        audio = frame.to_ndarray().flatten().astype('float32').tobytes()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            f.write(audio)
-            f.flush()
-            audio_path = f.name
-
-        try:
-            with sr.AudioFile(audio_path) as source:
-                audio_data = self.recognizer.record(source)
-                text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
-                self.result_queue.put(text)
-        except Exception:
-            self.result_queue.put("[Could not transcribe speech]")
-        finally:
-            os.remove(audio_path)
-
+    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
+        audio_data = frame.to_ndarray()
+        audio_queue.put(audio_data)
         return frame
 
-# Initialize session state
-if "transcribed" not in st.session_state:
-    st.session_state.transcribed = ""
-
-# WebRTC audio stream with async processing
+# WebRTC streamer
 webrtc_ctx = webrtc_streamer(
-    key="voice-translator",
+    key="speech-translator",
     mode=WebRtcMode.SENDRECV,
+    in_audio=True,
+    out_audio=False,
+    rtc_configuration=rtc_config,
     audio_processor_factory=AudioProcessor,
-    rtc_configuration=rtc_configuration,
-    media_stream_constraints={"audio": True, "video": False},
-    async_processing=True
+    media_stream_constraints={"audio": True, "video": False}
 )
 
-# Retrieve transcribed text from audio processor
-if webrtc_ctx and webrtc_ctx.state.playing:
-    if webrtc_ctx.audio_processor:
+# Handle translation and TTS
+if webrtc_ctx.state.playing:
+    st.success("Microphone is live. Start speaking...")
+
+    if not audio_queue.empty():
+        st.info("Processing audio...")
+
+        # Note: you need to convert audio_queue data to a proper format for speech recognition.
+        # This placeholder can be replaced with the actual speech_recognition processing.
+
         try:
-            result_text = webrtc_ctx.audio_processor.result_queue.get(timeout=1)
-            if result_text and result_text != st.session_state.transcribed:
-                st.session_state.transcribed = result_text
-        except queue.Empty:
-            pass
+            import speech_recognition as sr
+            import numpy as np
+            import tempfile
+            import wave
 
-# Display transcribed and translated output
-if st.session_state.transcribed:
-    st.markdown("### ✏️ Transcribed Text")
-    st.write(st.session_state.transcribed)
+            recognizer = sr.Recognizer()
 
-    target_code = languages[target_lang]
-    translated = translate_text(
-        st.session_state.transcribed,
-        src_lang=languages[source_lang],
-        target_lang=target_code
-    )
+            # Get audio data from queue
+            frames = []
+            while not audio_queue.empty():
+                frames.append(audio_queue.get())
 
-    st.markdown("### 🌍 Translated Text")
-    st.success(translated)
+            if frames:
+                audio_data = np.concatenate(frames).astype(np.int16)
 
-    audio_file = generate_tts_audio(translated, lang_code=target_code)
-    if audio_file:
-        st.markdown("### 🔊 Translated Audio")
-        with open(audio_file, "rb") as f:
-            st.audio(f.read(), format="audio/mp3")
-        os.remove(audio_file)
-    else:
-        st.warning(f"Speech not supported for language: {target_lang}")
+                # Save audio to temporary WAV file
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                    with wave.open(f.name, "wb") as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)  # 16-bit = 2 bytes
+                        wf.setframerate(16000)  # standard sample rate
+                        wf.writeframes(audio_data.tobytes())
+                    temp_wav_path = f.name
+
+                with sr.AudioFile(temp_wav_path) as source:
+                    audio = recognizer.record(source)
+
+                try:
+                    # Transcribe
+                    text = recognizer.recognize_google(audio)
+                    st.write(f"**You said:** {text}")
+
+                    # Translate
+                    translated = translate_text(text, target_lang=target_lang)
+                    st.success(f"**Translated ({target_lang}):** {translated}")
+
+                    # TTS
+                    tts_path = generate_tts_audio(translated, target_lang)
+                    st.audio(tts_path, format="audio/mp3")
+
+                except sr.UnknownValueError:
+                    st.error("Could not understand the audio.")
+                except sr.RequestError as e:
+                    st.error(f"Could not request results; {e}")
+
+        except Exception as e:
+            st.error(f"An error occurred while processing the audio: {e}")
+else:
+    st.warning("Please click 'Start' to activate the microphone.")
