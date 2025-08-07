@@ -15,7 +15,7 @@ st.set_page_config(page_title="🎙️ Gisting", layout="centered")
 st.image("assets/gistinglogo.png", width=150)
 st.subheader("Real-Time Voice-to-Voice Translator")
 
-# Language dictionary (Swahili included)
+# Language dictionary
 languages = {
     "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
     "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
@@ -48,7 +48,7 @@ rtc_configuration = RTCConfiguration(
 
 # Audio processor class
 class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
+    def __init__(self) -> None:
         self.recognizer = sr.Recognizer()
 
     def recv(self, frame: av.AudioFrame):
@@ -62,26 +62,33 @@ class AudioProcessor(AudioProcessorBase):
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
-                st.session_state.transcribed = text
+                self.result_callback(text)
         except Exception as e:
-            st.session_state.transcribed = "[Could not transcribe speech]"
+            self.result_callback("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
 
         return frame
 
 # Initialize session state
-if 'transcribed' not in st.session_state:
+if "transcribed" not in st.session_state:
     st.session_state.transcribed = ""
 
-# WebRTC audio stream
-webrtc_streamer(
+# WebRTC audio stream with async processing
+webrtc_ctx = webrtc_streamer(
     key="voice-translator",
     mode=WebRtcMode.SENDRECV,
     audio_processor_factory=AudioProcessor,
     rtc_configuration=rtc_configuration,
-    media_stream_constraints={"audio": True, "video": False}
+    media_stream_constraints={"audio": True, "video": False},
+    async_processing=True
 )
+
+# Retrieve transcribed text from audio processor
+if webrtc_ctx.state.playing and webrtc_ctx.audio_processor:
+    result_text = webrtc_ctx.audio_processor.get_results()
+    if result_text and result_text != st.session_state.transcribed:
+        st.session_state.transcribed = result_text
 
 # Display transcribed and translated output
 if st.session_state.transcribed:
