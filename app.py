@@ -1,32 +1,34 @@
-# app.py
-
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode, RTCConfiguration
 import speech_recognition as sr
 from utils.translator import translate_text, generate_tts_audio
-from langdetect import detect
 import tempfile
 import os
 import av
 
+# Page setup
 st.set_page_config(page_title="🎙️ Gisting", layout="centered")
 
+# Show logo and title
+st.image("assets/gistinglogo.png", width=100)
 st.title("🎙️ Gisting")
 st.subheader("Real-Time Voice-to-Voice Translator")
 
-# Language dictionary
+# Language dictionary (with Swahili added)
 languages = {
     "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
     "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
-    "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn"
+    "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn",
+    "Swahili": "sw"
 }
 
+# Language selectors
 source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
 target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
 
 st.markdown("💡 Speak clearly into your microphone...")
 
-# STUN/TURN configuration
+# TURN/STUN configuration
 rtc_configuration = RTCConfiguration(
     {
         "iceServers": [
@@ -40,6 +42,7 @@ rtc_configuration = RTCConfiguration(
     }
 )
 
+# Audio Processor Class
 class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recognizer = sr.Recognizer()
@@ -62,11 +65,11 @@ class AudioProcessor(AudioProcessorBase):
             os.remove(audio_path)
         return frame
 
-# Initialize session state
+# Session state
 if 'transcribed' not in st.session_state:
     st.session_state.transcribed = ""
 
-# Start WebRTC with TURN/STUN
+# Stream from microphone
 webrtc_streamer(
     key="voice-translator",
     mode=WebRtcMode.SENDRECV,
@@ -74,6 +77,7 @@ webrtc_streamer(
     rtc_configuration=rtc_configuration
 )
 
+# Show transcribed + translated results
 if st.session_state.transcribed:
     st.markdown("### ✏️ Transcribed Text")
     st.write(st.session_state.transcribed)
