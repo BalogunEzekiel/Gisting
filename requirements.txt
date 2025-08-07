@@ -6,3 +6,4 @@ deep-translator
 streamlit-webrtc
 langdetect
 av
+numpy
