@@ -1,7 +1,7 @@
 # app.py
 
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode, RTCConfiguration
 import speech_recognition as sr
 from utils.translator import translate_text, generate_tts_audio
 from langdetect import detect
@@ -26,6 +26,20 @@ target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()
 
 st.markdown("💡 Speak clearly into your microphone...")
 
+# STUN/TURN configuration
+rtc_configuration = RTCConfiguration(
+    {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {
+                "urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
+                "username": "openrelayproject",
+                "credential": "openrelayproject"
+            }
+        ]
+    }
+)
+
 class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recognizer = sr.Recognizer()
@@ -48,18 +62,28 @@ class AudioProcessor(AudioProcessorBase):
             os.remove(audio_path)
         return frame
 
-# Initialize session states
+# Initialize session state
 if 'transcribed' not in st.session_state:
     st.session_state.transcribed = ""
 
-webrtc_streamer(key="voice-translator", audio_processor_factory=AudioProcessor)
+# Start WebRTC with TURN/STUN
+webrtc_streamer(
+    key="voice-translator",
+    mode=WebRtcMode.SENDRECV,
+    audio_processor_factory=AudioProcessor,
+    rtc_configuration=rtc_configuration
+)
 
 if st.session_state.transcribed:
     st.markdown("### ✏️ Transcribed Text")
     st.write(st.session_state.transcribed)
 
     target_code = languages[target_lang]
-    translated = translate_text(st.session_state.transcribed, src_lang=languages[source_lang], target_lang=target_code)
+    translated = translate_text(
+        st.session_state.transcribed,
+        src_lang=languages[source_lang],
+        target_lang=target_code
+    )
 
     st.markdown("### 🌍 Translated Text")
     st.success(translated)
