@@ -5,9 +5,19 @@ import av
 import queue
 
 # RTC Configuration (uses public Google STUN server)
-rtc_config = RTCConfiguration({
-    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-})
+rtc_config = RTCConfiguration(
+    {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {
+                "urls": ["turn:your.turn.server:3478"],
+                "username": "your_username",
+                "credential": "your_password"
+            }
+        ]
+    }
+)
+
 
 # Setup audio queue
 audio_queue = queue.Queue()
