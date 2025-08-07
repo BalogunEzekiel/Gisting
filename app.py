@@ -50,26 +50,43 @@ class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recognizer = sr.Recognizer()
         self.result_queue = queue.Queue()
-
+    
     def recv(self, frame: av.AudioFrame):
-        audio = frame.to_ndarray().flatten().astype('float32').tobytes()
+        audio_np = frame.to_ndarray()
+        sample_rate = frame.sample_rate
+    
+        # Convert stereo to mono if needed
+        if audio_np.ndim > 1:
+            audio_np = np.mean(audio_np, axis=0)
+    
+        # Normalize and convert to int16
+        max_val = np.max(np.abs(audio_np))
+        if max_val > 0:
+            audio_np = audio_np / max_val
+        audio_int16 = np.int16(audio_np * 32767)
+    
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            f.write(audio)
-            f.flush()
+            import wave
+            with wave.open(f, 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio_int16.tobytes())
             audio_path = f.name
-
+    
         try:
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 self.result_queue.put(text)
-        except Exception:
+        except Exception as e:
+            print(f"[Speech recognition error] {e}")
             self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
-
+    
         return frame
-
+    
 # Initialize session state
 if "transcribed" not in st.session_state:
     st.session_state.transcribed = ""
