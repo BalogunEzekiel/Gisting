@@ -24,12 +24,12 @@ languages = {
     "Swahili": "sw"
 }
 
-source_lang = st.selectbox("🎤 Select Spoken Language", options=list(input_languages.keys()))
-target_lang = st.selectbox("🗣️ Translate To", options=list(translation_languages.keys()), index=1)
+#source_lang = st.selectbox("🎤 Select Spoken Language", options=list(input_languages.keys()))
+#target_lang = st.selectbox("🗣️ Translate To", options=list(translation_languages.keys()), index=1)
 
 # Language selection
-#source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
-#target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
+source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
+target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
 
 st.markdown("💡 Speak clearly into your microphone...")
 
