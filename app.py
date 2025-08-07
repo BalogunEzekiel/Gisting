@@ -13,25 +13,22 @@ import wave
 
 # Page setup
 st.set_page_config(page_title="🎙️ Gisting", layout="centered")
+
+# Show logo and title
 st.image("assets/gistinglogo.png", width=150)
 st.subheader("Real-Time Voice-to-Voice Translator")
 
-# Display names and language code mapping
-input_languages = {
-    "English": "en-US", "French": "fr-FR", "Spanish": "es-ES", "German": "de-DE", 
-    "Hindi": "hi-IN", "Tamil": "ta-IN", "Telugu": "te-IN", "Japanese": "ja-JP", 
-    "Russian": "ru-RU", "Chinese": "zh-CN"
-}
-
-translation_languages = {
+# Language dictionary
+languages = {
     "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
     "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
-    "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn", "Swahili": "sw"
+    "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn",
+    "Swahili": "sw"
 }
 
 # Language selection
-source_lang = st.selectbox("🎤 Select Spoken Language", options=list(input_languages.keys()))
-target_lang = st.selectbox("🗣️ Translate To", options=list(translation_languages.keys()), index=1)
+source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
+target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
 
 st.markdown("💡 Speak clearly into your microphone...")
 
@@ -57,34 +54,34 @@ class AudioProcessor(AudioProcessorBase):
         self.result_queue = queue.Queue()
 
     def recv(self, frame: av.AudioFrame):
+        # Convert to numpy array
         audio_np = frame.to_ndarray()
         sample_rate = frame.sample_rate
         channels = frame.layout.channels
 
+        # Convert stereo to mono
         if channels > 1:
             audio_np = np.mean(audio_np, axis=1)
 
-        # Normalize and convert to int16
-        max_val = np.max(np.abs(audio_np))
-        if max_val > 0:
-            audio_np = audio_np / max_val  # normalize
+        # Convert float32 to int16 PCM
         audio_int16 = np.int16(audio_np * 32767)
 
+        # Write to proper WAV file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
             with wave.open(f, 'wb') as wf:
                 wf.setnchannels(1)
-                wf.setsampwidth(2)
+                wf.setsampwidth(2)  # 2 bytes = 16 bits
                 wf.setframerate(sample_rate)
                 wf.writeframes(audio_int16.tobytes())
             audio_path = f.name
 
+        # Perform speech recognition
         try:
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
-                text = self.recognizer.recognize_google(audio_data, language=input_languages[source_lang])
+                text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 self.result_queue.put(text)
         except Exception as e:
-            print(f"Speech recognition error: {e}")
             self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
@@ -120,10 +117,10 @@ if st.session_state.transcribed:
     st.markdown("### ✏️ Transcribed Text")
     st.write(st.session_state.transcribed)
 
-    target_code = translation_languages[target_lang]
+    target_code = languages[target_lang]
     translated = translate_text(
         st.session_state.transcribed,
-        src_lang=input_languages[source_lang].split("-")[0],
+        src_lang=languages[source_lang],
         target_lang=target_code
     )
 
