@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, WebRtcMode, RTCConfiguration
 import speech_recognition as sr
@@ -10,11 +12,10 @@ import av
 st.set_page_config(page_title="🎙️ Gisting", layout="centered")
 
 # Show logo and title
-st.image("assets/gistinglogo.png", width=100)
-st.title("🎙️ Gisting")
+st.image("assets/gistinglogo.png", width=150)
 st.subheader("Real-Time Voice-to-Voice Translator")
 
-# Language dictionary (with Swahili added)
+# Language dictionary (Swahili included)
 languages = {
     "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
     "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
@@ -22,13 +23,13 @@ languages = {
     "Swahili": "sw"
 }
 
-# Language selectors
+# Language selection
 source_lang = st.selectbox("🎤 Select Spoken Language", options=list(languages.keys()))
 target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()), index=1)
 
 st.markdown("💡 Speak clearly into your microphone...")
 
-# TURN/STUN configuration
+# TURN/STUN Configuration
 rtc_configuration = RTCConfiguration(
     {
         "iceServers": [
@@ -42,7 +43,7 @@ rtc_configuration = RTCConfiguration(
     }
 )
 
-# Audio Processor Class
+# Audio processor class
 class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recognizer = sr.Recognizer()
@@ -59,25 +60,27 @@ class AudioProcessor(AudioProcessorBase):
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 st.session_state.transcribed = text
-        except:
+        except Exception as e:
             st.session_state.transcribed = "[Could not transcribe speech]"
         finally:
             os.remove(audio_path)
+
         return frame
 
-# Session state
+# Initialize session state
 if 'transcribed' not in st.session_state:
     st.session_state.transcribed = ""
 
-# Stream from microphone
+# WebRTC audio stream
 webrtc_streamer(
     key="voice-translator",
     mode=WebRtcMode.SENDRECV,
     audio_processor_factory=AudioProcessor,
-    rtc_configuration=rtc_configuration
+    rtc_configuration=rtc_configuration,
+    media_stream_constraints={"audio": True, "video": False}
 )
 
-# Show transcribed + translated results
+# Display transcribed and translated output
 if st.session_state.transcribed:
     st.markdown("### ✏️ Transcribed Text")
     st.write(st.session_state.transcribed)
