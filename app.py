@@ -7,6 +7,7 @@ from utils.translator import translate_text, generate_tts_audio
 import tempfile
 import os
 import av
+import queue
 
 # Page setup
 st.set_page_config(page_title="🎙️ Gisting", layout="centered")
@@ -48,8 +49,9 @@ rtc_configuration = RTCConfiguration(
 
 # Audio processor class
 class AudioProcessor(AudioProcessorBase):
-    def __init__(self) -> None:
+    def __init__(self):
         self.recognizer = sr.Recognizer()
+        self.result_queue = queue.Queue()
 
     def recv(self, frame: av.AudioFrame):
         audio = frame.to_ndarray().flatten().astype('float32').tobytes()
@@ -62,9 +64,9 @@ class AudioProcessor(AudioProcessorBase):
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
-                self.result_callback(text)
-        except Exception as e:
-            self.result_callback("[Could not transcribe speech]")
+                self.result_queue.put(text)
+        except Exception:
+            self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
 
@@ -85,10 +87,14 @@ webrtc_ctx = webrtc_streamer(
 )
 
 # Retrieve transcribed text from audio processor
-if webrtc_ctx.state.playing and webrtc_ctx.audio_processor:
-    result_text = webrtc_ctx.audio_processor.get_results()
-    if result_text and result_text != st.session_state.transcribed:
-        st.session_state.transcribed = result_text
+if webrtc_ctx and webrtc_ctx.state.playing:
+    if webrtc_ctx.audio_processor:
+        try:
+            result_text = webrtc_ctx.audio_processor.result_queue.get(timeout=1)
+            if result_text and result_text != st.session_state.transcribed:
+                st.session_state.transcribed = result_text
+        except queue.Empty:
+            pass
 
 # Display transcribed and translated output
 if st.session_state.transcribed:
