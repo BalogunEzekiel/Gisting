@@ -34,6 +34,9 @@ rtc_configuration = RTCConfiguration(
     {
         "iceServers": [
             {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]},
+            {"urls": ["stun:stun.ekiga.net"]},
             {
                 "urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
                 "username": "openrelayproject",
