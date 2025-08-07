@@ -8,8 +8,6 @@ import tempfile
 import os
 import av
 import queue
-import numpy as np
-import wave
 
 # Page setup
 st.set_page_config(page_title="🎙️ Gisting", layout="centered")
@@ -36,6 +34,8 @@ st.markdown("💡 Speak clearly into your microphone...")
 rtc_configuration = RTCConfiguration(
     {
         "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
             {"urls": ["stun:stun2.l.google.com:19302"]},
             {"urls": ["stun:stun.ekiga.net"]},
             {
@@ -54,34 +54,18 @@ class AudioProcessor(AudioProcessorBase):
         self.result_queue = queue.Queue()
 
     def recv(self, frame: av.AudioFrame):
-        # Convert to numpy array
-        audio_np = frame.to_ndarray()
-        sample_rate = frame.sample_rate
-        channels = frame.layout.channels
-
-        # Convert stereo to mono
-        if channels > 1:
-            audio_np = np.mean(audio_np, axis=1)
-
-        # Convert float32 to int16 PCM
-        audio_int16 = np.int16(audio_np * 32767)
-
-        # Write to proper WAV file
+        audio = frame.to_ndarray().flatten().astype('float32').tobytes()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            with wave.open(f, 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)  # 2 bytes = 16 bits
-                wf.setframerate(sample_rate)
-                wf.writeframes(audio_int16.tobytes())
+            f.write(audio)
+            f.flush()
             audio_path = f.name
 
-        # Perform speech recognition
         try:
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 self.result_queue.put(text)
-        except Exception as e:
+        except Exception:
             self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
