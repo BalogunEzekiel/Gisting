@@ -36,8 +36,6 @@ class AudioProcessor(AudioProcessorBase):
 webrtc_ctx = webrtc_streamer(
     key="speech-translator",
     mode=WebRtcMode.SENDRECV,
-    in_audio=True,
-    out_audio=False,
     rtc_configuration=rtc_config,
     audio_processor_factory=AudioProcessor,
     media_stream_constraints={"audio": True, "video": False}
