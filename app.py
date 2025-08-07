@@ -53,30 +53,29 @@ class AudioProcessor(AudioProcessorBase):
     def __init__(self):
         self.recognizer = sr.Recognizer()
         self.result_queue = queue.Queue()
-    
+##########################
     def recv(self, frame: av.AudioFrame):
         audio_np = frame.to_ndarray()
         sample_rate = frame.sample_rate
-    
-        # Convert stereo to mono if needed
-        if audio_np.ndim > 1:
-            audio_np = np.mean(audio_np, axis=0)
-    
-        # Normalize and convert to int16
-        max_val = np.max(np.abs(audio_np))
-        if max_val > 0:
-            audio_np = audio_np / max_val
+        channels = frame.layout.channels
+
+        # Convert stereo to mono
+        if channels > 1:
+            audio_np = np.mean(audio_np, axis=1)
+
+        # Convert float32 to int16 PCM
         audio_int16 = np.int16(audio_np * 32767)
-    
+
+        # Write to proper WAV file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-            import wave
             with wave.open(f, 'wb') as wf:
                 wf.setnchannels(1)
-                wf.setsampwidth(2)
+                wf.setsampwidth(2)  # 2 bytes = 16 bits
                 wf.setframerate(sample_rate)
                 wf.writeframes(audio_int16.tobytes())
             audio_path = f.name
-    
+
+        # Perform speech recognition
         try:
             with sr.AudioFile(audio_path) as source:
                 audio_data = self.recognizer.record(source)
@@ -95,6 +94,7 @@ class AudioProcessor(AudioProcessorBase):
             os.remove(audio_path)
     
         return frame
+        ###############################   
     
 # Initialize session state
 if "transcribed" not in st.session_state:
