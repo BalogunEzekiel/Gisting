@@ -39,9 +39,9 @@ rtc_configuration = RTCConfiguration(
             {"urls": ["stun:stun2.l.google.com:19302"]},
             {"urls": ["stun:stun.ekiga.net"]},
             {
-                "urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
-                "username": "openrelayproject",
-                "credential": "openrelayproject"
+                "urls": ["turn:global.xirsys.net:3478?transport=udp"],
+                "username": "ezekiel4true",
+                "credential": "f0592ae8-73e2-11f0-a6bd-0242ac130002"
             }
         ]
     }
@@ -101,6 +101,9 @@ webrtc_ctx = webrtc_streamer(
     media_stream_constraints={"audio": True, "video": False},
     async_processing=True
 )
+
+if webrtc_ctx:
+    st.write(f"ICE Connection State: {webrtc_ctx.ice_connection_state}")
 
 # Retrieve transcribed text from audio processor
 if webrtc_ctx and webrtc_ctx.state.playing:
