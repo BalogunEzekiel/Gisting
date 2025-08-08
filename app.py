@@ -20,8 +20,8 @@ st.subheader("Real-Time Voice-to-Voice Translator")
 
 # Language dictionary
 languages = {
-    "English": "en", "French": "fr", "Spanish": "es", "German": "de", 
-    "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja", 
+    "English": "en", "French": "fr", "Spanish": "es", "German": "de",
+    "Hindi": "hi", "Tamil": "ta", "Telugu": "te", "Japanese": "ja",
     "Russian": "ru", "Yoruba": "yo", "Igbo": "ig", "Chinese": "zh-cn",
     "Swahili": "sw"
 }
@@ -32,14 +32,15 @@ target_lang = st.selectbox("🗣️ Translate To", options=list(languages.keys()
 
 st.markdown("💡 Speak clearly into your microphone...")
 
-# TURN/STUN Configuration
+# TURN/STUN Configuration (Stable Combo)
 rtc_configuration = RTCConfiguration(
     {
         "iceServers": [
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-            {"urls": ["stun:stun.ekiga.net"]},
+            # Google STUN servers
+            {"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"]},
+            # Xirsys TURN
             {
-                "urls": ["turn:global.xirsys.net:3478?transport=udp"],
+                "urls": ["turn:global.xirsys.net:3478?transport=udp", "turn:global.xirsys.net:3478?transport=tcp"],
                 "username": "ezekiel4true",
                 "credential": "f0592ae8-73e2-11f0-a6bd-0242ac130002"
             }
@@ -81,7 +82,7 @@ class AudioProcessor(AudioProcessorBase):
                 audio_data = self.recognizer.record(source)
                 text = self.recognizer.recognize_google(audio_data, language=languages[source_lang])
                 self.result_queue.put(text)
-        except Exception as e:
+        except Exception:
             self.result_queue.put("[Could not transcribe speech]")
         finally:
             os.remove(audio_path)
@@ -102,8 +103,9 @@ webrtc_ctx = webrtc_streamer(
     async_processing=True
 )
 
-if webrtc_ctx:
-    st.write(f"ICE Connection State: {webrtc_ctx.ice_connection_state}")
+# Safe ICE state debug
+if webrtc_ctx and hasattr(webrtc_ctx, "pc") and webrtc_ctx.pc:
+    st.write(f"ICE Connection State: {webrtc_ctx.pc.iceConnectionState}")
 
 # Retrieve transcribed text from audio processor
 if webrtc_ctx and webrtc_ctx.state.playing:
